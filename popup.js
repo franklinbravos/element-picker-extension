@@ -14,7 +14,19 @@ btn.addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
 
-  await chrome.tabs.sendMessage(tab.id, { action: 'toggle-picker' });
+  try {
+    await chrome.tabs.sendMessage(tab.id, { action: 'toggle-picker' });
+  } catch {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js'],
+    });
+    await chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ['content.css'],
+    });
+    await chrome.tabs.sendMessage(tab.id, { action: 'toggle-picker' });
+  }
   window.close();
 });
 
