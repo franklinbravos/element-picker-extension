@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #010e24;
+      --surface: #061934;
+      --text: #dbe6ff;
+      --text-dim: #9eabc8;
+      --primary: #50e1f9;
+      --primary-container: #00bcd4;
+      --border: #3b4861;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--primary);
+    }
+    p.desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .shortcut {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .shortcut kbd {
+      background: #102645;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--primary);
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .btn-primary {
+      background: var(--primary-container);
+      color: var(--bg);
+    }
+    .btn-primary:hover {
+      background: var(--primary);
+    }
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+    .btn-primary.active {
+      background: #ff716c;
+    }
+    .example {
+      margin-top: 16px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-dim);
+    }
+    .example code {
+      display: block;
+      background: var(--bg);
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin: 6px 0 0;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--primary);
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .footer {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .footer select {
+      flex: 1;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Element Picker</h1>
+  <p class="desc">Clique em qualquer elemento da página para copiar o seletor CSS.</p>
+
+  <div class="shortcut">
+    <span>Atalho</span>
+    <kbd id="shortcut-display">Ctrl+Shift+P</kbd>
+  </div>
+
+  <button class="btn btn-primary" id="toggle-btn">🎯 Ativar Picker</button>
+
+  <div class="example">
+    <strong>Formato copiado:</strong>
+    <code id="preview">&lt;button class="btn-primary"&gt;
+  CSS Selector: div.container > button.btn-primary
+  Text: "Enviar"
+  Size: 120×40
+  [type="submit"]</code>
+  </div>
+
+  <div class="footer">
+    <select id="format-select">
+      <option value="full">Formato completo</option>
+      <option value="selector">Apenas seletor CSS</option>
+      <option value="component">Componente + seletor</option>
+      <option value="xpath">XPath</option>
+    </select>
+    <button class="btn btn-primary" id="settings-btn" style="flex:0;padding:6px 12px">⚙</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
