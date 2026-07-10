@@ -16,6 +16,7 @@ btn.addEventListener('click', async () => {
 
   try {
     await chrome.tabs.sendMessage(tab.id, { action: 'toggle-picker' });
+    window.close();
   } catch {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -26,8 +27,8 @@ btn.addEventListener('click', async () => {
       files: ['content.css'],
     });
     await chrome.tabs.sendMessage(tab.id, { action: 'toggle-picker' });
+    window.close();
   }
-  window.close();
 });
 
 chrome.commands.getAll((commands) => {
