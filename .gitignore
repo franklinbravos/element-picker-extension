@@ -2,3 +2,6 @@
 .memory/
 opencode.json
 .ignore
+element-picker.zip
+node_modules/
+package*.json
