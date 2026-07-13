@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Element Picker for AI Agents",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Clique em elementos da página para copiar seletores CSS — cole no OpenCode/Cursor/Claude.",
   "permissions": ["activeTab", "clipboardWrite", "storage", "scripting"],
   "action": {

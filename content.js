@@ -68,12 +68,151 @@ function generateSelector(el) {
   return path.join(' > ');
 }
 
+function generateXPath(el) {
+  if (el.id) return `//*[@id="${el.id}"]`;
+
+  const parts = [];
+  let current = el;
+
+  while (current && current !== document.documentElement) {
+    const tag = current.tagName.toLowerCase();
+    let part = tag;
+
+    if (current.id) {
+      parts.unshift(`//*[@id="${current.id}"]`);
+      break;
+    }
+
+    const parent = current.parentElement;
+    if (parent) {
+      const siblings = [...parent.children].filter(
+        (s) => s.tagName === current.tagName
+      );
+      if (siblings.length > 1) {
+        const idx = siblings.indexOf(current) + 1;
+        part += `[${idx}]`;
+      }
+    }
+
+    parts.unshift(part);
+    current = current.parentElement;
+  }
+
+  return '/' + parts.join('/');
+}
+
+function getElementRole(el) {
+  const tag = el.tagName.toLowerCase();
+  const roleAttr = el.getAttribute('role');
+  const disabled = el.getAttribute('aria-disabled') === 'true' || el.disabled;
+  let role = 'generic';
+  let interaction = null;
+
+  if (tag === 'a') {
+    role = 'link';
+  } else if (tag === 'button') {
+    role = 'button';
+  } else if (tag === 'input') {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (['submit', 'reset', 'button'].includes(type)) {
+      role = 'button';
+    } else if (type === 'checkbox') {
+      role = 'checkbox';
+    } else if (type === 'radio') {
+      role = 'radio';
+    } else if (type === 'range') {
+      role = 'slider';
+    } else if (type === 'number') {
+      role = 'spinbutton';
+    } else if (type === 'search') {
+      role = 'searchbox';
+    } else {
+      role = 'textbox';
+    }
+  } else if (tag === 'textarea') {
+    role = 'textbox';
+  } else if (tag === 'img') {
+    role = 'img';
+  } else if (tag === 'select') {
+    role = 'combobox';
+  } else if (/^h[1-6]$/.test(tag)) {
+    role = 'heading';
+  }
+
+  if (roleAttr) {
+    role = roleAttr;
+  }
+
+  if (tag === 'a' || tag === 'button' || role === 'link' || role === 'button') {
+    interaction = 'clickable';
+  } else if (tag === 'textarea' || role === 'textbox' || role === 'searchbox') {
+    interaction = 'typeable';
+  } else if (role === 'checkbox' || role === 'radio' || role === 'combobox' || role === 'listbox') {
+    interaction = 'selectable';
+  } else if (tag === 'select') {
+    interaction = 'selectable';
+  } else if (tag === 'input') {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (['submit', 'reset', 'button'].includes(type)) {
+      interaction = 'clickable';
+    } else if (type === 'checkbox' || type === 'radio') {
+      interaction = 'selectable';
+    } else {
+      interaction = 'typeable';
+    }
+  }
+
+  if (disabled) {
+    role += ' (disabled)';
+  }
+
+  return { role, interaction };
+}
+
+function getNearestIdParent(el) {
+  const chain = [];
+  let current = el;
+
+  while (current && current !== document.documentElement) {
+    chain.unshift(current);
+    if (current.id) break;
+    current = current.parentElement;
+  }
+
+  if (!chain.length || !chain[0].id) return null;
+
+  const parts = chain.map((node) => {
+    const tag = node.tagName.toLowerCase();
+    let sel = tag;
+    if (node.classList.length > 0) {
+      const classes = [...node.classList]
+        .filter((c) => !c.startsWith('__el-picker'))
+        .slice(0, 2);
+      if (classes.length > 0) sel += '.' + classes.join('.');
+    }
+    return sel;
+  });
+
+  parts[0] = `#${CSS.escape(chain[0].id)}`;
+  return parts.join(' > ');
+}
+
+function getSelectorMatchCount(selector) {
+  try {
+    const count = document.querySelectorAll(selector).length;
+    return { count, unique: count === 1 };
+  } catch {
+    return { count: 0, unique: false };
+  }
+}
+
 function getElementInfo(el) {
   const tag = el.tagName.toLowerCase();
   const id = el.id ? `#${el.id}` : '';
   const classes = [...el.classList].filter((c) => !c.startsWith('__el-picker'));
   const cls = classes.length > 0 ? `.${classes.join('.')}` : '';
   const rect = el.getBoundingClientRect();
+  const selector = generateSelector(el);
   return {
     tag,
     id: el.id || null,
@@ -81,7 +220,13 @@ function getElementInfo(el) {
     text: (el.textContent || '').trim().slice(0, 80),
     dims: `${Math.round(rect.width)}×${Math.round(rect.height)}`,
     attrs: getRelevantAttrs(el),
-    selector: generateSelector(el),
+    selector,
+    xpath: generateXPath(el),
+    role: getElementRole(el),
+    nearestIdParent: getNearestIdParent(el),
+    matchInfo: getSelectorMatchCount(selector),
+    pageUrl: window.location.href,
+    timestamp: new Date().toISOString(),
   };
 }
 
@@ -96,14 +241,34 @@ function getRelevantAttrs(el) {
 }
 
 function formatForClipboard(info) {
-  const lines = [];
-  lines.push(`<${info.tag}${info.id ? ` id="${info.id}"` : ''}${info.classes.length > 0 ? ` class="${info.classes.join(' ')}"` : ''}>`);
-  lines.push(`  CSS Selector: ${info.selector}`);
-  if (info.text) lines.push(`  Text: "${info.text}"`);
-  if (info.dims) lines.push(`  Size: ${info.dims}`);
-  for (const [k, v] of Object.entries(info.attrs)) {
-    lines.push(`  [${k}="${v}"]`);
+  const lines = ['## Element Info'];
+
+  const tagStr = `<${info.tag}${info.id ? ` id="${info.id}"` : ''}${info.classes.length > 0 ? ` class="${info.classes.join(' ')}"` : ''}>`;
+  lines.push(`- **Tag:** \`${tagStr}\``);
+  lines.push(`- **CSS Selector:** \`${info.selector}\``);
+
+  if (info.xpath) lines.push(`- **XPath:** \`${info.xpath}\``);
+  if (info.text) lines.push(`- **Text:** "${info.text}"`);
+  if (info.dims) lines.push(`- **Size:** ${info.dims}`);
+  if (info.pageUrl) lines.push(`- **Page URL:** ${info.pageUrl}`);
+  if (info.matchInfo) {
+    lines.push(`- **Selector Matches:** ${info.matchInfo.count} (${info.matchInfo.unique ? 'unique' : 'not unique'})`);
   }
+  if (info.nearestIdParent) {
+    lines.push(`- **Nearest Unique Parent:** \`${info.nearestIdParent}\``);
+  }
+  if (info.role) {
+    const roleLine = info.role.interaction
+      ? `- **Role:** ${info.role.role} — ${info.role.interaction}`
+      : `- **Role:** ${info.role.role}`;
+    lines.push(roleLine);
+  }
+
+  const attrStr = Object.entries(info.attrs)
+    .map(([k, v]) => `${k}="${v}"`)
+    .join(' ');
+  if (attrStr) lines.push(`- **Attributes:** \`${attrStr}\``);
+
   return lines.join('\n');
 }
 
