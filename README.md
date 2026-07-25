@@ -1,38 +1,50 @@
 # Element Picker for AI Agents
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.6.1-blue)
 
 Browser extension that lets users click any element on a page and instantly copies its CSS selector + rich metadata to clipboard, formatted as a markdown prompt ready for AI coding assistants (OpenCode, Cursor, Claude Code).
 
 ## Features
 
-- **Visual element picker** -- hover highlights elements with a blue overlay and floating tooltip
-- **Rich clipboard output** in markdown format including: tag, CSS selector, XPath, text content, size, page URL, selector uniqueness, nearest ID parent, ARIA role with interaction hint, all relevant attributes
+- **Visual element picker** — hover highlights elements with a blue overlay and floating tooltip
+- **Rich clipboard output** in markdown format including: tag, CSS selector, XPath, DOM path, text content, size, position, page URL, selector uniqueness, nearest ID parent, ARIA role with interaction hint, all relevant attributes, outerHTML, React component name
+- **Element screenshot** — optionally captures a cropped JPEG screenshot of the selected element and embeds it as a base64 image in the clipboard output
+- **Adjustable screenshot quality/size** — full, medium (50%), small (25%), micro (15%)
 - **Keyboard shortcut:** `Ctrl+Shift+L` (or `Cmd+Shift+L` on Mac) to toggle picker on/off
 - **Esc** to cancel picker
 - **Visual feedback:** flash outline and toast "Copied!" on selection
-- **Works on any webpage** via content script injection
-- **Clipboard fallback** for restricted environments
-- **Output format selector** in popup (full, selector only, component+selector, XPath)
+- **Output format selector** in popup (full markdown, selector only, component+selector, XPath, HTML outerHTML)
+- **iframe support** — detects if the element lives inside an iframe and includes the frame URL
+- **React component detection** — traverses the React fiber tree to find the component name
+- **Toggle on/off** from the popup UI — click the status bar to toggle
 
 ## Installation
 
 Since the extension is not published on the Chrome Web Store:
 
 1. Download or clone this repository
-2. Open `chrome://extensions/`
-3. Enable **Developer mode** (toggle in the top right corner)
-4. Click **"Load unpacked"**
-5. Select the extension folder
-6. The extension appears in the toolbar with the blue crosshair icon
+2. Run `npm install` to install dependencies
+3. Run `npm run build` to build the extension
+4. Open `chrome://extensions/`
+5. Enable **Developer mode** (toggle in the top right corner)
+6. Click **"Load unpacked"**
+7. Select the `.output/` directory (WXT build output)
+8. The extension appears in the toolbar with the blue crosshair icon
 
 ## Usage
 
 1. Click the extension icon in the toolbar or press `Ctrl+Shift+L`
-2. Hover over any element -- it highlights with a blue border and shows a tooltip with basic info
-3. Click the element -- info is copied to clipboard
-4. Press `Esc` or click the icon again to cancel
+2. Hover over any element — it highlights with a blue border and shows a tooltip with basic info
+3. Click the element — text info is copied to clipboard immediately; a screenshot is captured asynchronously and updates the clipboard if successful
+4. Press `Esc` or toggle the picker off in the popup to cancel
 5. Paste into OpenCode/Cursor/Claude (the data is already formatted as a markdown prompt)
+
+### Popup controls
+
+- **Status bar** — click to toggle the picker on/off (shows green dot when active)
+- **Output format** — choose between Full (markdown), CSS Selector only, Component + Selector, XPath, or HTML (outerHTML)
+- **Screenshot checkbox** — enable/disable element screenshot capture
+- **Screenshot size** — select resolution preset (Original JPEG, Medium 50%, Small 25%, Micro 15%)
 
 ## Keyboard shortcut
 
@@ -42,59 +54,93 @@ Since the extension is not published on the Chrome Web Store:
 
 ## Output format
 
-When you click an element, the following markdown is copied to your clipboard:
+When you click an element with the **Full** format selected, the following markdown is copied to your clipboard:
 
 ```
+--- Element Info ---
 ## Element Info
 - **Tag:** `<a class="site-header__brand">`
+- **DOM Path:** `header > div.site-header__inner > a.site-header__brand`
+- **Position:** top=0px, left=0px, width=430px, height=32px
 - **CSS Selector:** `header.site-header > div.site-header__inner > a.site-header__brand`
 - **XPath:** `/html/body/header[1]/div[1]/a[1]`
 - **Text:** "Bravos Consult"
+- **React Component:** `Header`
 - **Size:** 430x32
 - **Page URL:** https://franklinbravos.com
 - **Selector Matches:** 1 (unique)
 - **Nearest Unique Parent:** `#header > div.site-header__inner`
-- **Role:** link -- clickable
+- **Role:** link — clickable
 - **Attributes:** `href="https://franklinbravos.com"`
+
+```html
+<a class="site-header__brand" href="https://franklinbravos.com">Bravos Consult</a>
 ```
 
-Field descriptions:
+--- End Element Info ---
+```
 
-- **Tag** -- reconstructed opening tag with id and classes
-- **CSS Selector** -- ready-to-use CSS selector string
-- **XPath** -- XPath 1.0 expression (standard, position-based)
-- **Text** -- trimmed text content (first 80 characters)
-- **Size** -- element dimensions in pixels (width x height)
-- **Page URL** -- URL of the page where the element lives
-- **Selector Matches** -- how many elements on the page match this CSS selector (1 = unique)
-- **Nearest Unique Parent** -- CSS path from the nearest ancestor with an id down to the element
-- **Role** -- computed ARIA role and an interaction hint (clickable, typeable, selectable, or blank)
-- **Attributes** -- relevant attributes (href, src, alt, placeholder, aria-label, data-testid, etc.)
+If screenshot capture is enabled, a `![Element Screenshot](data:image/jpeg;base64,...)` line is appended before the footer.
+
+### Other formats
+
+| Format | Output |
+|---|---|
+| **selector** | Just the CSS selector string |
+| **xpath** | Just the XPath expression |
+| **component** | Tag, CSS selector, text, size, and relevant attributes |
+| **html** | The element's outerHTML wrapped in a markdown code block |
 
 ## File structure
 
 ```
-├── manifest.json        # Extension manifest (v3)
-├── content.js           # Content script: picker logic, selector generation, clipboard
-├── content.css          # Minimal injection styles
-├── background.js        # Service worker: message relay and keyboard commands
-├── popup.html           # Popup UI
-├── popup.js             # Popup logic (toggle, format selector, settings)
-└── icons/
-    ├── icon16.png       # Toolbar icon (16x16)
-    ├── icon48.png       # Extension management icon (48x48)
-    └── icon128.png      # Store icon (128x128)
+├── wxt.config.ts            # WXT configuration (manifest, paths, build)
+├── tsconfig.json            # TypeScript config
+├── package.json             # Dependencies and scripts
+├── src/
+│   └── entrypoints/
+│       ├── background.ts     # Service worker (screenshot crop, badge, commands)
+│       ├── content.content.ts# Content script (picker logic, selectors, clipboard)
+│       ├── picker-styles.css # Minimal injection styles
+│       └── popup/
+│           ├── index.html    # Popup UI
+│           └── main.ts       # Popup logic (toggle, format, screenshot prefs)
+├── public/
+│   └── icons/
+│       ├── icon16.png        # Toolbar icon (16x16)
+│       ├── icon48.png        # Extension management icon (48x48)
+│       └── icon128.png       # Store icon (128x128)
+├── sw.js                     # Standalone service worker (legacy)
+├── background.js             # Legacy background script
+├── content.js                # Legacy content script
+├── popup.html                # Legacy popup
+├── popup.js                  # Legacy popup logic
+└── manifest.json             # Legacy manifest (v3)
 ```
 
 ## Tech stack
 
-- Manifest V3
-- Vanilla JavaScript (zero dependencies)
-- Native CSS
-- Chrome Extensions API (scripting, activeTab, clipboardWrite, storage)
+- **Build tool:** WXT v0.19
+- **Language:** TypeScript
+- **Target:** Chrome Manifest V3
+- **Runtime:** Chrome Extensions API (scripting, activeTab, clipboardWrite, storage, tabs)
+- **Screenshot processing:** OffscreenCanvas + createImageBitmap + FileReader (inside service worker)
+- **Zero runtime dependencies** — only WXT + TypeScript as dev dependencies
 
 ## Development
 
-- No build step -- edit files and reload in `chrome://extensions/`
-- Reload the extension using the reload button after making changes
-- To regenerate icons: `node build-icons.mjs` (requires sharp)
+```bash
+# Install dependencies
+npm install
+
+# Start dev server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Package as .zip for Chrome Web Store
+npm run zip
+```
+
+The extension loads from the `.output/` directory after building. During `npm run dev`, WXT automatically rebuilds on file changes and the extension can be reloaded at `chrome://extensions/`.
