@@ -2,12 +2,14 @@ import { defineConfig } from 'wxt'
 
 export default defineConfig({
   srcDir: 'src',
-  outDir: '.output',
+  outDir: 'dist',
+  publicDir: 'public',
   manifest: {
     name: 'Element Picker for AI Agents',
-    version: '1.6.1',
+    version: '1.6.2',
     description: 'Clique em elementos da página para copiar seletores CSS — cole no OpenCode/Cursor/Claude.',
     permissions: ['activeTab', 'clipboardWrite', 'storage', 'scripting', 'tabs'],
+    host_permissions: ['<all_urls>'],
     action: {
       default_title: 'Element Picker',
       default_popup: 'popup.html',

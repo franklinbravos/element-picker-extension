@@ -6,3 +6,4 @@ element-picker.zip
 node_modules/
 .output/
 .wxt/
+dist/

@@ -1,6 +1,6 @@
 # Element Picker for AI Agents
 
-![Version](https://img.shields.io/badge/version-1.6.1-blue)
+![Version](https://img.shields.io/badge/version-1.6.2-blue)
 
 Browser extension that lets users click any element on a page and instantly copies its CSS selector + rich metadata to clipboard, formatted as a markdown prompt ready for AI coding assistants (OpenCode, Cursor, Claude Code).
 
@@ -28,11 +28,13 @@ Browser extension that lets users click any element on a page and instantly copi
 ```bash
 git clone <repo-url>
 cd element-picker-extension
+git checkout main          # default branch
+nvm install --lts          # (skip if Node.js 18+ installed)
 npm install
-npm run build    # ← required! produces .output/
+npm run build              # ← required! produces dist/
 ```
 
-Then load `.output/` as an unpacked extension in Chrome.
+Then load `dist/chrome-mv3/` as an unpacked extension in Chrome.
 
 ## Installation
 
@@ -42,7 +44,7 @@ Since the extension is not published on the Chrome Web Store:
 2. Open `chrome://extensions/`
 3. Enable **Developer mode** (toggle in the top right corner)
 4. Click **"Load unpacked"**
-5. Select the `.output/` directory — this is the build output from WXT
+5. Select the `dist/chrome-mv3/` directory — this is the build output from WXT
 6. The extension appears in the toolbar with the blue crosshair icon
 
 > **Important:** the project uses WXT to compile TypeScript source files into a production bundle. You *must* build before loading — the legacy `.js`/`.html` files at the project root are stale and are not used by the current build.
@@ -156,9 +158,9 @@ Only the files under `src/` and `public/` are source code. Everything else is bu
 ├── wxt.config.ts                 # WXT + manifest configuration
 ├── tsconfig.json                 # TypeScript compiler options
 ├── package.json                  # Dependencies & scripts
-├── .gitignore                    # Ignores .output/ and .wxt/
+├── .gitignore                    # Ignores dist/, .wxt/, node_modules/
 │
-├── .output/                      # (gitignored) WXT build output
+├── dist/                         # (gitignored) WXT build output → dist/chrome-mv3/
 ├── .wxt/                         # (gitignored) WXT cache
 ├── node_modules/                 # (gitignored)
 │
@@ -191,14 +193,14 @@ npm install
 # Development server (auto-rebuild on changes)
 npm run dev
 
-# Production build → .output/
+# Production build → dist/
 npm run build
 
 # Package as .zip for Chrome Web Store submission
 npm run zip
 ```
 
-After building, the extension lives in `.output/`. During `npm run dev`, WXT watches `src/` and rebuilds on every change — reload the extension at `chrome://extensions/` to pick up the new build.
+After building, the extension lives in `dist/chrome-mv3/`. During `npm run dev`, WXT watches `src/` and rebuilds on every change — reload the extension at `chrome://extensions/` to pick up the new build.
 
 ### Adding an entrypoint
 
