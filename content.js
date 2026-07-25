@@ -1,10 +1,19 @@
-let active = false
-let overlay = null
-let tooltip = null
-let badge = null
-let currentEl = null
-let currentFormat = 'full'
-let captureScreenshot = true
+if (document.getElementById('__el-picker-guard')) {
+  document.getElementById('__el-picker-guard').remove()
+}
+const guard = document.createElement('meta')
+guard.id = '__el-picker-guard'
+document.head.appendChild(guard)
+
+console.log('[Picker] content.js loaded and injected')
+
+var active = false
+var overlay = null
+var tooltip = null
+var badge = null
+var currentEl = null
+var currentFormat = 'full'
+var captureScreenshot = true
 var screenshotSize = 'medium'
 
 function createOverlay() {
@@ -312,10 +321,6 @@ function formatForClipboard(info, format) {
         .map(([k, v]) => `${k}="${v}"`)
         .join(' ')
       if (attrStr) lines.push(`- **Attributes:** \`${attrStr}\``)
-      if (info.screenshot) {
-        lines.push('')
-        lines.push(`![Element Screenshot](${info.screenshot})`)
-      }
       lines.push('--- End Element Info ---')
       return lines.join('\n')
     }
@@ -328,6 +333,7 @@ function onMouseMove(e) {
   if (!el || el === currentEl) return;
   if (el.id === '__el-picker-overlay' || el.id === '__el-picker-tooltip') return;
 
+  console.log('[Picker] onMouseMove hover:', el.tagName, el.id || el.className)
   currentEl = el;
   const rect = el.getBoundingClientRect();
   overlay.style.top = `${rect.top}px`;
@@ -358,13 +364,26 @@ async function onClick(e) {
   e.preventDefault();
   e.stopPropagation();
 
+  console.log('[Picker] onClick fired on element')
   const el = currentEl || document.elementFromPoint(e.clientX, e.clientY);
   if (!el) return;
 
   const info = getElementInfo(el);
-  let screenshot = null
+  const text = formatForClipboard(info, currentFormat);
 
-  if (currentFormat === 'full' && captureScreenshot) {
+  // Copy text without screenshot immediately (within user activation)
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'
+  ta.style.left = '-9999px'
+  document.body.appendChild(ta)
+  ta.select()
+  document.execCommand('copy')
+  ta.remove()
+
+  // Then try screenshot asynchronously
+  if (captureScreenshot && currentFormat === 'full') {
+    console.log('[Picker] screenshot block: entering, captureScreenshot=' + captureScreenshot + ', format=' + currentFormat)
     const rect = el.getBoundingClientRect()
     const size = screenshotSize || 'medium'
     const presets = {
@@ -373,35 +392,36 @@ async function onClick(e) {
       small:  { quality: 0.5, scale: 0.25 },
       micro:  { quality: 0.3, scale: 0.15 },
     }
-    const options = presets[size] || presets.medium
     try {
-      screenshot = await chrome.runtime.sendMessage({
-        action: 'capture-element',
-        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-        options,
-      })
-    } catch (_) {}
-    if (screenshot) info.screenshot = screenshot
+      console.log('[Picker] screenshot: sending message to service worker')
+      const resp = await Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'copy-with-screenshot',
+          text: text,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          options: (presets[size] || presets.medium),
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ])
+      console.log('[Picker] screenshot: got response', resp ? 'with text length ' + resp.text.length : 'no response')
+      if (resp?.text && !resp.error) {
+        try {
+          await navigator.clipboard.writeText(resp.text)
+          console.log('[Picker] screenshot: clipboard updated with image')
+        } catch (e) {
+          console.log('[Picker] screenshot: clipboard update failed:', String(e))
+        }
+      }
+    } catch (err) {
+      console.log('[Picker] screenshot: error:', err.message || String(err))
+    }
+  } else {
+    console.log('[Picker] screenshot block: skipped (captureScreenshot=' + captureScreenshot + ', format=' + currentFormat + ')')
   }
 
-  const text = formatForClipboard(info, currentFormat);
-  await copyText(text)
-
+  console.log('[Picker] onClick: calling flashCopied and deactivate')
   flashCopied(el);
   deactivate();
-}
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch (_) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-  }
 }
 
 function flashCopied(el) {
@@ -428,22 +448,25 @@ function onKeyDown(e) {
 }
 
 function activate() {
-  if (active) return;
+  if (active) { console.log('[Picker] activate skipped — already active'); return; }
+  console.log('[Picker] activate() called')
   active = true;
-  if (!overlay) createOverlay();
-  if (!tooltip) createTooltip();
-  if (!badge) createBadge();
+  if (!overlay) { console.log('[Picker] creating overlay'); createOverlay(); }
+  if (!tooltip) { console.log('[Picker] creating tooltip'); createTooltip(); }
+  if (!badge) { console.log('[Picker] creating badge'); createBadge(); }
   document.addEventListener('mousemove', onMouseMove, true);
   document.addEventListener('click', onClick, true);
   document.addEventListener('keydown', onKeyDown);
   document.body.style.cursor = 'crosshair';
   overlay.style.display = 'block';
   badge.style.display = 'flex';
+  console.log('[Picker] activate complete, overlay visible, badge visible')
   chrome.runtime.sendMessage({ action: 'badge-on' }).catch(() => {})
 }
 
 function deactivate() {
-  if (!active) return;
+  if (!active) { console.log('[Picker] deactivate skipped — not active'); return; }
+  console.log('[Picker] deactivate() called')
   active = false;
   document.removeEventListener('mousemove', onMouseMove, true);
   document.removeEventListener('click', onClick, true);
@@ -457,25 +480,30 @@ function deactivate() {
 }
 
 chrome.runtime.onMessage.addListener((msg) => {
+  console.log('[Picker] received message:', msg.action, msg)
   if (msg.action === 'toggle-picker') {
     currentFormat = msg.format || 'full'
     if (msg.screenshot !== undefined) captureScreenshot = msg.screenshot
     if (msg.screenshotSize !== undefined) screenshotSize = msg.screenshotSize
+    console.log('[Picker] toggling: active was', active)
     active ? deactivate() : activate()
   }
   if (msg.action === 'activate-picker') {
+    console.log('[Picker] activate-picker received')
     currentFormat = msg.format || 'full'
     if (msg.screenshot !== undefined) captureScreenshot = msg.screenshot
     if (msg.screenshotSize !== undefined) screenshotSize = msg.screenshotSize
     activate()
   }
   if (msg.action === 'deactivate-picker') {
+    console.log('[Picker] deactivate-picker received')
     deactivate()
   }
   if (msg.action === 'set-format') {
     currentFormat = msg.format || 'full'
   }
   if (msg.action === 'set-prefs') {
+    console.log('[Picker] set-prefs:', msg.format, msg.screenshot, msg.screenshotSize)
     if (msg.format) currentFormat = msg.format
     if (msg.screenshot !== undefined) captureScreenshot = msg.screenshot
     if (msg.screenshotSize !== undefined) screenshotSize = msg.screenshotSize

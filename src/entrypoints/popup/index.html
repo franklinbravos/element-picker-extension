@@ -46,20 +46,14 @@
       cursor: pointer;
       user-select: none;
     }
-    .status:hover {
-      border-color: var(--primary);
-    }
-    .status.inactive {
-      opacity: 0.6;
-    }
-    .status.inactive .dot {
-      background: var(--text-dim);
-    }
+    .status:hover { border-color: var(--primary); }
+    .status.inactive { opacity: 0.6; }
+    .status.inactive .dot { background: var(--text-dim); }
     .status .dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--primary-container);
+      background: var(--text-dim);
       flex-shrink: 0;
     }
     .field label {
@@ -91,9 +85,7 @@
       opacity: 0;
       transition: opacity 0.2s;
     }
-    .saved.show {
-      opacity: 1;
-    }
+    .saved.show { opacity: 1; }
     .checkbox-field {
       display: flex;
       align-items: center;
@@ -111,11 +103,11 @@
 </head>
 <body>
   <h1>Element Picker</h1>
-  <p class="desc">Picker ativo — clique em qualquer elemento da página.</p>
+  <p class="desc">Clique no toggle abaixo para ativar.</p>
 
   <div class="status" id="toggle-picker" role="button" tabindex="0">
     <span class="dot" id="status-dot"></span>
-    <span id="status-text">Picker ativo</span>
+    <span id="status-text">Desativado</span>
   </div>
 
   <div class="field">
@@ -144,7 +136,6 @@
       <option value="micro">Micro — 15%</option>
     </select>
   </div>
-
-  <script src="popup.js"></script>
+  <script type="module" src="./main.ts"></script>
 </body>
 </html>

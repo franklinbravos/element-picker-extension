@@ -1,17 +1,17 @@
-const formatSelect = document.getElementById('format-select')
-const screenshotCheckbox = document.getElementById('screenshot-checkbox')
-const screenshotSizeSelect = document.getElementById('screenshot-size')
-const screenshotSizeField = document.getElementById('screenshot-size-field')
-const savedMsg = document.getElementById('saved-msg')
-const toggleBtn = document.getElementById('toggle-picker')
-const statusDot = document.getElementById('status-dot')
-const statusText = document.getElementById('status-text')
+const formatSelect = document.getElementById('format-select') as HTMLSelectElement
+const screenshotCheckbox = document.getElementById('screenshot-checkbox') as HTMLInputElement
+const screenshotSizeSelect = document.getElementById('screenshot-size') as HTMLSelectElement
+const screenshotSizeField = document.getElementById('screenshot-size-field') as HTMLElement
+const savedMsg = document.getElementById('saved-msg') as HTMLElement
+const toggleBtn = document.getElementById('toggle-picker') as HTMLElement
+const statusDot = document.getElementById('status-dot') as HTMLElement
+const statusText = document.getElementById('status-text') as HTMLElement
 
-var pickerActive = false
+let pickerActive = false
 
 toggleBtn.addEventListener('click', togglePicker)
 
-chrome.storage.local.get(['format', 'screenshot', 'screenshotSize', 'pickerActive'], (data) => {
+chrome.storage.local.get(['format', 'screenshot', 'screenshotSize', 'pickerActive'], (data: any) => {
   if (!data) data = {}
   if (data.format) formatSelect.value = data.format
   if (data.screenshotSize) screenshotSizeSelect.value = data.screenshotSize
@@ -20,15 +20,25 @@ chrome.storage.local.get(['format', 'screenshot', 'screenshotSize', 'pickerActiv
   if (data.pickerActive) {
     pickerActive = true
     updateUI()
-    sendMsg({ action: 'toggle-picker', format: formatSelect.value, screenshot: screenshotCheckbox.checked, screenshotSize: screenshotSizeSelect.value })
+    sendMsg({
+      action: 'toggle-picker',
+      format: formatSelect.value,
+      screenshot: screenshotCheckbox.checked,
+      screenshotSize: screenshotSizeSelect.value,
+    })
   }
 })
 
 function togglePicker() {
   pickerActive = !pickerActive
-  chrome.storage.local.set({ pickerActive: pickerActive })
+  chrome.storage.local.set({ pickerActive })
   updateUI()
-  sendMsg({ action: 'toggle-picker', format: formatSelect.value, screenshot: screenshotCheckbox.checked, screenshotSize: screenshotSizeSelect.value })
+  sendMsg({
+    action: 'toggle-picker',
+    format: formatSelect.value,
+    screenshot: screenshotCheckbox.checked,
+    screenshotSize: screenshotSizeSelect.value,
+  })
 }
 
 function updateUI() {
@@ -43,17 +53,14 @@ function updateUI() {
   }
 }
 
-function sendMsg(msg) {
+function sendMsg(msg: any) {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     if (!tab?.id) return
-    console.log('[Popup] sending message:', msg.action, 'to tab', tab.id)
-    chrome.tabs.sendMessage(tab.id, msg).catch(() => {
-      console.log('[Popup] sendMessage failed — content script may not be loaded')
-    })
+    chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
   })
 }
 
-function sendPrefs(format, screenshot, screenshotSize) {
+function sendPrefs(format: string, screenshot: boolean, screenshotSize: string) {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     if (!tab?.id) return
     chrome.tabs.sendMessage(tab.id, { action: 'set-prefs', format, screenshot, screenshotSize }).catch(() => {})
