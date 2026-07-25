@@ -18,18 +18,34 @@ Browser extension that lets users click any element on a page and instantly copi
 - **React component detection** — traverses the React fiber tree to find the component name
 - **Toggle on/off** from the popup UI — click the status bar to toggle
 
+## Requirements
+
+- **Node.js** 18+
+- **npm** 9+
+
+## Quick start
+
+```bash
+git clone <repo-url>
+cd element-picker-extension
+npm install
+npm run build    # ← required! produces .output/
+```
+
+Then load `.output/` as an unpacked extension in Chrome.
+
 ## Installation
 
 Since the extension is not published on the Chrome Web Store:
 
-1. Download or clone this repository
-2. Run `npm install` to install dependencies
-3. Run `npm run build` to build the extension
-4. Open `chrome://extensions/`
-5. Enable **Developer mode** (toggle in the top right corner)
-6. Click **"Load unpacked"**
-7. Select the `.output/` directory (WXT build output)
-8. The extension appears in the toolbar with the blue crosshair icon
+1. Clone the repo and run `npm install && npm run build` (see [Development](#development))
+2. Open `chrome://extensions/`
+3. Enable **Developer mode** (toggle in the top right corner)
+4. Click **"Load unpacked"**
+5. Select the `.output/` directory — this is the build output from WXT
+6. The extension appears in the toolbar with the blue crosshair icon
+
+> **Important:** the project uses WXT to compile TypeScript source files into a production bundle. You *must* build before loading — the legacy `.js`/`.html` files at the project root are stale and are not used by the current build.
 
 ## Usage
 
@@ -41,16 +57,20 @@ Since the extension is not published on the Chrome Web Store:
 
 ### Popup controls
 
-- **Status bar** — click to toggle the picker on/off (shows green dot when active)
+- **Status bar** — click to toggle the picker on/off (shows green dot when active, dims when inactive)
 - **Output format** — choose between Full (markdown), CSS Selector only, Component + Selector, XPath, or HTML (outerHTML)
 - **Screenshot checkbox** — enable/disable element screenshot capture
 - **Screenshot size** — select resolution preset (Original JPEG, Medium 50%, Small 25%, Micro 15%)
+- Preferences are persisted in `chrome.storage.local`
 
 ## Keyboard shortcut
 
-- Toggle picker: `Ctrl+Shift+L` (Windows/Linux) / `Cmd+Shift+L` (Mac)
-- Cancel: `Esc`
-- Customize at `chrome://extensions/shortcuts`
+| Action | Windows/Linux | Mac |
+|---|---|---|
+| Toggle picker | `Ctrl+Shift+L` | `Cmd+Shift+L` |
+| Cancel | `Esc` | `Esc` |
+
+Customize at `chrome://extensions/shortcuts`.
 
 ## Output format
 
@@ -91,41 +111,76 @@ If screenshot capture is enabled, a `![Element Screenshot](data:image/jpeg;base6
 | **component** | Tag, CSS selector, text, size, and relevant attributes |
 | **html** | The element's outerHTML wrapped in a markdown code block |
 
-## File structure
+## Architecture
+
+The extension follows WXT's entrypoint-based structure:
 
 ```
-├── wxt.config.ts            # WXT configuration (manifest, paths, build)
-├── tsconfig.json            # TypeScript config
-├── package.json             # Dependencies and scripts
-├── src/
+┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   popup/     │────▶│  content script   │◀────│  background.ts  │
+│  main.ts     │     │ content.content.ts│     │ (service worker)│
+│  index.html  │     │ + picker-styles   │     │                 │
+└──────────────┘     └────────┬─────────┘     └─────────────────┘
+                              │
+                              ▼
+                     User clicks element
+                     → formatForClipboard()
+                     → document.execCommand('copy')
+                     → if screenshot enabled:
+                       sendMessage → background.ts
+                       → captureVisibleTab
+                       → OffscreenCanvas crop
+                       → JPEG compression
+                       → navigator.clipboard.writeText()
+```
+
+- **background.ts** — service worker: handles keyboard commands, screenshot cropping (OffscreenCanvas), badge management, and iframe URL resolution
+- **content.content.ts** — injected into every page: overlay/tooltip/badge DOM, mouse tracking, selector/XPath generation, clipboard write, React fiber tree inspection
+- **popup/** — toggle picker, format/screenshot prefs persisted in `chrome.storage.local`
+
+## File structure
+
+Only the files under `src/` and `public/` are source code. Everything else is build configuration or stale legacy files.
+
+```
+├── src/                          # ◄── SOURCE CODE (TypeScript)
 │   └── entrypoints/
-│       ├── background.ts     # Service worker (screenshot crop, badge, commands)
-│       ├── content.content.ts# Content script (picker logic, selectors, clipboard)
-│       ├── picker-styles.css # Minimal injection styles
+│       ├── background.ts         #     Service worker
+│       ├── content.content.ts    #     Content script (picker logic)
+│       ├── picker-styles.css     #     Injected styles
 │       └── popup/
-│           ├── index.html    # Popup UI
-│           └── main.ts       # Popup logic (toggle, format, screenshot prefs)
+│           ├── index.html        #     Popup UI
+│           └── main.ts           #     Popup logic
 ├── public/
-│   └── icons/
-│       ├── icon16.png        # Toolbar icon (16x16)
-│       ├── icon48.png        # Extension management icon (48x48)
-│       └── icon128.png       # Store icon (128x128)
-├── sw.js                     # Standalone service worker (legacy)
-├── background.js             # Legacy background script
-├── content.js                # Legacy content script
-├── popup.html                # Legacy popup
-├── popup.js                  # Legacy popup logic
-└── manifest.json             # Legacy manifest (v3)
+│   └── icons/                    # ◄── Static assets
+├── wxt.config.ts                 # WXT + manifest configuration
+├── tsconfig.json                 # TypeScript compiler options
+├── package.json                  # Dependencies & scripts
+├── .gitignore                    # Ignores .output/ and .wxt/
+│
+├── .output/                      # (gitignored) WXT build output
+├── .wxt/                         # (gitignored) WXT cache
+├── node_modules/                 # (gitignored)
+│
+├── background.js                 # ┐
+├── content.js                    # │
+├── manifest.json                 # ├─ Legacy files (stale, not used)
+├── popup.html                    # │
+├── popup.js                      # │
+└── sw.js                         # ┘
 ```
 
 ## Tech stack
 
-- **Build tool:** WXT v0.19
-- **Language:** TypeScript
-- **Target:** Chrome Manifest V3
-- **Runtime:** Chrome Extensions API (scripting, activeTab, clipboardWrite, storage, tabs)
-- **Screenshot processing:** OffscreenCanvas + createImageBitmap + FileReader (inside service worker)
-- **Zero runtime dependencies** — only WXT + TypeScript as dev dependencies
+| Layer | Technology |
+|---|---|
+| **Build tool** | [WXT](https://wxt.dev) v0.19 |
+| **Language** | TypeScript 5 |
+| **Target platform** | Chrome Manifest V3 |
+| **Extension APIs** | scripting, activeTab, clipboardWrite, storage, tabs |
+| **Screenshot** | OffscreenCanvas + createImageBitmap inside service worker |
+| **Runtime deps** | None (zero dependencies) |
+| **Dev deps** | `wxt`, `typescript` |
 
 ## Development
 
@@ -133,14 +188,28 @@ If screenshot capture is enabled, a `![Element Screenshot](data:image/jpeg;base6
 # Install dependencies
 npm install
 
-# Start dev server with hot reload
+# Development server (auto-rebuild on changes)
 npm run dev
 
-# Build for production
+# Production build → .output/
 npm run build
 
-# Package as .zip for Chrome Web Store
+# Package as .zip for Chrome Web Store submission
 npm run zip
 ```
 
-The extension loads from the `.output/` directory after building. During `npm run dev`, WXT automatically rebuilds on file changes and the extension can be reloaded at `chrome://extensions/`.
+After building, the extension lives in `.output/`. During `npm run dev`, WXT watches `src/` and rebuilds on every change — reload the extension at `chrome://extensions/` to pick up the new build.
+
+### Adding an entrypoint
+
+WXT uses file-based routing in `src/entrypoints/`:
+
+| File pattern | Entrypoint type |
+|---|---|
+| `background.ts` | Service worker |
+| `*.content.ts` | Content script (injected into pages) |
+| `popup/` | Popup (index.html + main.ts) |
+| `options/` | Options page |
+| `sandbox/` | Sandboxed page |
+
+See [WXT docs](https://wxt.dev/guide/entrypoints.html) for details.
