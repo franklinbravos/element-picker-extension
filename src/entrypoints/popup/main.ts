@@ -56,14 +56,26 @@ function updateUI() {
 function sendMsg(msg: any) {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     if (!tab?.id) return
-    chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
+    sendToAllFrames(tab.id, msg)
   })
 }
 
 function sendPrefs(format: string, screenshot: boolean, screenshotSize: string) {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     if (!tab?.id) return
-    chrome.tabs.sendMessage(tab.id, { action: 'set-prefs', format, screenshot, screenshotSize }).catch(() => {})
+    sendToAllFrames(tab.id, { action: 'set-prefs', format, screenshot, screenshotSize })
+  })
+}
+
+function sendToAllFrames(tabId: number, msg: any) {
+  chrome.webNavigation.getAllFrames({ tabId }, (frames) => {
+    if (frames) {
+      for (const frame of frames) {
+        chrome.tabs.sendMessage(tabId, msg, { frameId: frame.frameId }).catch(() => {})
+      }
+    } else {
+      chrome.tabs.sendMessage(tabId, msg).catch(() => {})
+    }
   })
 }
 

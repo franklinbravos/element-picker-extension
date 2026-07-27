@@ -42,18 +42,30 @@ export default defineBackground(() => {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
           const tab = tabs[0]
           if (!tab?.id) return
-          console.log('[SW] Sending toggle-picker to tab', tab.id)
-          chrome.tabs.sendMessage(tab.id, {
+          const msg = {
             action: 'toggle-picker',
             format: res.format || 'full',
             screenshot: res.screenshot !== false,
             screenshotSize: res.screenshotSize || 'medium',
-          }).catch((err: any) => console.log('[SW] sendMessage failed:', err))
+          }
+          sendToAllFrames(tab.id, msg)
         })
       })
     })
   } catch (e) {
     console.log('[SW] Error adding onCommand listener:', e)
+  }
+
+  function sendToAllFrames(tabId: number, msg: any) {
+    chrome.webNavigation.getAllFrames({ tabId }, (frames) => {
+      if (frames) {
+        for (const frame of frames) {
+          chrome.tabs.sendMessage(tabId, msg, { frameId: frame.frameId }).catch(() => {})
+        }
+      } else {
+        chrome.tabs.sendMessage(tabId, msg).catch(() => {})
+      }
+    })
   }
 
   async function handleScreenshot(msg: any, sendResponse: (resp: any) => void) {
