@@ -6,7 +6,7 @@ export default defineConfig({
   publicDir: 'public',
   manifest: {
     name: 'Element Picker for AI Agents',
-    version: '1.6.3',
+    version: '1.6.4',
     description: 'Clique em elementos da página para copiar seletores CSS — cole no OpenCode/Cursor/Claude.',
     permissions: ['activeTab', 'clipboardWrite', 'storage', 'scripting', 'tabs', 'webNavigation'],
     host_permissions: ['<all_urls>'],

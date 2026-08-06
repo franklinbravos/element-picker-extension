@@ -373,6 +373,24 @@ export default defineContentScript({
       tooltip!.style.display = 'block'
     }
 
+    async function copyToClipboard(text: string) {
+      try {
+        await navigator.clipboard.writeText(text)
+        return
+      } catch {
+        // fall back to legacy execCommand
+      }
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+
     async function onClick(e: MouseEvent) {
       if (!active) return
       e.preventDefault()
@@ -381,15 +399,7 @@ export default defineContentScript({
       if (!el) return
       const info = getElementInfo(el)
       const text = formatForClipboard(info, currentFormat)
-
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.left = '-9999px'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      ta.remove()
+      await copyToClipboard(text)
 
       if (captureScreenshot && currentFormat === 'full') {
         const rect = el.getBoundingClientRect()
@@ -417,7 +427,7 @@ export default defineContentScript({
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
           ]) as any
           if (resp?.text && !resp.error) {
-            try { await navigator.clipboard.writeText(resp.text) } catch { /* best-effort */ }
+            await copyToClipboard(resp.text)
           }
         } catch { /* screenshot failed, text already copied */ }
       }
